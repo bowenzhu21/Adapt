@@ -21,6 +21,8 @@ const FALLBACK_PLAN = {
     motion: 'normal' as const,
     font: 'Inter',
     density: 'comfy' as const,
+    emotion: 'curious',
+    intent: 'chat',
   },
   components: [{ type: 'chat', props: {} }],
 };
@@ -207,6 +209,12 @@ export async function POST(request: Request) {
       console.error('OpenAI interpretation failed', error);
     }
 
+    plan.theme = {
+      ...plan.theme,
+      emotion: plan.emotion,
+      intent: plan.intent,
+    };
+
     const { error: insertInterpretationError } = await supabase.from('interpretations').insert({
       message_id: messageId,
       intent: plan.intent,
@@ -249,6 +257,8 @@ export async function POST(request: Request) {
       {
         theme: plan.theme,
         components: plan.components,
+        emotion: plan.emotion,
+        intent: plan.intent,
       },
       { status: 200 },
     );

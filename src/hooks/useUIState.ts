@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase/client';
 type UIState = {
   theme: any | null;
   components: Array<any>;
+  emotion: string | null;
+  intent: string | null;
 };
 
 type UIStateHookReturn = UIState & {
@@ -28,6 +30,8 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
       return {
         theme: null,
         components: [],
+        emotion: null,
+        intent: null,
         loading: false,
         error: NOT_FOUND_ERROR,
       };
@@ -42,16 +46,22 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
       return {
         theme: null,
         components: [],
+        emotion: null,
+        intent: null,
         loading: false,
         error: message,
       };
     }
 
     const data = await response.json();
+    const theme = data?.theme ?? null;
+    const components = Array.isArray(data?.components) ? data.components : [];
 
     return {
-      theme: data?.theme ?? null,
-      components: Array.isArray(data?.components) ? data.components : [],
+      theme,
+      components,
+      emotion: theme?.emotion ?? null,
+      intent: theme?.intent ?? null,
       loading: false,
       error: null,
     };
@@ -61,6 +71,8 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
     return {
       theme: null,
       components: [],
+      emotion: null,
+      intent: null,
       loading: false,
       error: message,
     };
@@ -70,12 +82,16 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
 export function useUIState(conversationId: string): UIStateHookReturn {
   const [theme, setTheme] = useState<any | null>(null);
   const [components, setComponents] = useState<Array<any>>([]);
+  const [emotion, setEmotion] = useState<string | null>(null);
+  const [intent, setIntent] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!conversationId) {
       setTheme(null);
       setComponents([]);
+      setEmotion(null);
+      setIntent(null);
       setError('Missing conversation identifier.');
       setLoading(false);
       return;
@@ -90,6 +106,8 @@ export function useUIState(conversationId: string): UIStateHookReturn {
 
       setTheme(result.theme);
       setComponents(result.components);
+      setEmotion(result.theme?.emotion ?? null);
+      setIntent(result.theme?.intent ?? null);
       setError(result.error);
       setLoading(result.loading);
     });
@@ -106,10 +124,13 @@ export function useUIState(conversationId: string): UIStateHookReturn {
         },
         (payload) => {
           if (!payload.new) return;
-          setTheme(payload.new.theme ?? null);
+          const nextTheme = payload.new.theme ?? null;
+          setTheme(nextTheme);
           setComponents(
             Array.isArray(payload.new.components) ? payload.new.components : [],
           );
+          setEmotion(nextTheme?.emotion ?? null);
+          setIntent(nextTheme?.intent ?? null);
           setError(null);
           setLoading(false);
         },
@@ -124,10 +145,13 @@ export function useUIState(conversationId: string): UIStateHookReturn {
         },
         (payload) => {
           if (!payload.new) return;
-          setTheme(payload.new.theme ?? null);
+          const nextTheme = payload.new.theme ?? null;
+          setTheme(nextTheme);
           setComponents(
             Array.isArray(payload.new.components) ? payload.new.components : [],
           );
+          setEmotion(nextTheme?.emotion ?? null);
+          setIntent(nextTheme?.intent ?? null);
           setError(null);
           setLoading(false);
         },
@@ -150,6 +174,8 @@ export function useUIState(conversationId: string): UIStateHookReturn {
         conversationId: string;
         theme: any;
         components: Array<any>;
+        emotion?: string | null;
+        intent?: string | null;
       } | null>;
 
       const detail = custom.detail;
@@ -157,8 +183,13 @@ export function useUIState(conversationId: string): UIStateHookReturn {
         return;
       }
 
-      setTheme(detail.theme ?? null);
+      const nextTheme = detail.theme ?? null;
+      setTheme(nextTheme);
       setComponents(Array.isArray(detail.components) ? detail.components : []);
+      const nextEmotion =
+        detail.emotion ?? nextTheme?.emotion ?? (detail.intent ? detail.intent : null);
+      setEmotion(nextEmotion ?? null);
+      setIntent(detail.intent ?? nextTheme?.intent ?? null);
       setError(null);
       setLoading(false);
     };
@@ -174,10 +205,12 @@ export function useUIState(conversationId: string): UIStateHookReturn {
     () => ({
       theme,
       components,
+      emotion,
+      intent,
       loading,
       error,
     }),
-    [theme, components, loading, error],
+    [theme, components, emotion, intent, loading, error],
   );
 }
 

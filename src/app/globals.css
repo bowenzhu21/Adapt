@@ -5,6 +5,9 @@
   --fg: 226 232 240;     /* slate-200 */
   --primary: 99 102 241; /* indigo-500 */
   --accent: 168 85 247;  /* purple-500 */
+  --bg-gradient-from: 30 41 59;
+  --bg-gradient-to: 63 76 107;
+  --shadow-accent: 99 102 241;
   --motion-duration: 300ms;
 }
 
@@ -18,7 +21,7 @@
 }
 
 body {
-  background-color: rgb(var(--bg) / 1);
+  background-color: rgb(var(--bg) / 0.92);
   color: rgb(var(--fg) / 1);
   font-family: var(
       --font-family,
@@ -38,7 +41,8 @@ body {
 *::before,
 *::after {
   transition: color var(--motion-duration) ease, background-color var(--motion-duration) ease,
-    border-color var(--motion-duration) ease, background var(--motion-duration) ease;
+    border-color var(--motion-duration) ease, background var(--motion-duration) ease,
+    backdrop-filter var(--motion-duration) ease;
 }
 
 .pad {
@@ -81,6 +85,39 @@ html[data-motion="snappy"] {
   --motion-duration: 150ms;
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: -12%;
+  z-index: -2;
+  background: radial-gradient(
+      115% 115% at 15% 18%,
+      rgb(var(--bg-gradient-from) / 0.55) 0%,
+      rgb(var(--bg-gradient-to) / 0.85) 42%,
+      rgb(var(--bg) / 1) 100%
+    );
+  opacity: 1;
+  transition: background var(--motion-duration) ease, opacity var(--motion-duration) ease,
+    transform 20s ease-in-out;
+  animation: gradient-shift 22s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: -8%;
+  z-index: -2;
+  background: radial-gradient(
+      60% 60% at 85% 80%,
+      rgb(var(--accent) / 0.12) 0%,
+      rgb(var(--accent) / 0.02) 45%,
+      transparent 70%
+    );
+  transition: opacity var(--motion-duration) ease;
+  pointer-events: none;
+}
+
 @keyframes surface-fade {
   from {
     opacity: 0;
@@ -118,4 +155,13 @@ html[data-motion="snappy"] {
 
 .animate-send-pulse {
   animation: send-pulse calc(var(--motion-duration) * 1.2) ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    transform: translate3d(-4%, -2%, 0) scale(1.05);
+  }
+  100% {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+  }
 }

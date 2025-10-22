@@ -6,9 +6,27 @@ import { FormEvent, useState } from 'react';
 type ChatInputProps = {
   conversationId: string;
   className?: string;
+  emotion?: string | null;
 };
 
-export function ChatInput({ conversationId, className }: ChatInputProps) {
+const emotionPlaceholderMap: Record<string, string> = {
+  focus: 'What should we concentrate on next?',
+  calm: 'Share how you want to unwind…',
+  curious: 'What are you curious about right now?',
+  reflective: 'What reflections are on your mind?',
+  energized: 'Where should we channel this energy?',
+  energised: 'Where should we channel this energy?',
+  creative: 'What would you like to create today?',
+  relaxed: 'What helps you slow down?',
+};
+
+function resolvePlaceholder(emotion?: string | null) {
+  if (!emotion) return 'Share how you’d like this space to feel…';
+  const key = emotion.toLowerCase();
+  return emotionPlaceholderMap[key] ?? 'Share how you’d like this space to feel…';
+}
+
+export function ChatInput({ conversationId, className, emotion }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +43,13 @@ export function ChatInput({ conversationId, className }: ChatInputProps) {
     setIsSubmitting(true);
     setError(null);
     setStatus('Shifting your space…');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('ui-state:pending', {
+          detail: { conversationId, active: true },
+        }),
+      );
+    }
 
     try {
       const response = await fetch('/api/interpret', {
@@ -48,7 +73,7 @@ export function ChatInput({ conversationId, className }: ChatInputProps) {
         setStatus('Something went wrong. Try again gently.');
       } else {
         const payload = (await response.json().catch(() => null)) as
-          | { theme?: unknown; components?: unknown }
+          | { theme?: unknown; components?: unknown; emotion?: string; intent?: string }
           | null;
         setMessage('');
         setStatus('Space realigned. Describe the next shift when you are ready.');
@@ -59,6 +84,8 @@ export function ChatInput({ conversationId, className }: ChatInputProps) {
                 conversationId,
                 theme: payload.theme ?? null,
                 components: Array.isArray(payload.components) ? payload.components : [],
+                emotion: payload.emotion ?? null,
+                intent: payload.intent ?? null,
               },
             }),
           );
@@ -71,6 +98,13 @@ export function ChatInput({ conversationId, className }: ChatInputProps) {
       setStatus('Something went wrong. Try again gently.');
     } finally {
       setIsSubmitting(false);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ui-state:pending', {
+            detail: { conversationId, active: false },
+          }),
+        );
+      }
     }
   }
 
@@ -91,7 +125,7 @@ export function ChatInput({ conversationId, className }: ChatInputProps) {
         name="message"
         value={message}
         onChange={(event) => setMessage(event.target.value)}
-        placeholder="Share how you’d like this space to feel…"
+        placeholder={resolvePlaceholder(emotion)}
         disabled={isSubmitting}
         rows={4}
         aria-invalid={Boolean(error)}
