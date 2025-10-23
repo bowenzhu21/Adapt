@@ -9,6 +9,12 @@
   --bgA: rgba(99, 102, 241, 0.28);
   --bgB: rgba(168, 85, 247, 0.22);
 
+  --dock-w: min(520px, 33vw);
+  --dock-handle-w: 32px;
+  --dock-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+  --dock-bg: rgba(20, 23, 35, 0.82);
+  --dock-border: rgba(255, 255, 255, 0.08);
+
   --radius: 24px;
   --panel: rgba(255, 255, 255, 0.42);
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
@@ -58,6 +64,12 @@ body[data-density="comfy"] {
 :root[data-density="compact"],
 body[data-density="compact"] {
   --density: 0.9;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --dock-w: 100vw;
+  }
 }
 
 html,
@@ -116,14 +128,92 @@ body[data-density="compact"] * {
   transform: translateY(-1px);
 }
 
-@keyframes surface-fade {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+.chatdock-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+
+.chatdock-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--dock-w);
+  height: 100%;
+  background: rgba(16, 16, 18, 0.92);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid var(--dock-border);
+  box-shadow: var(--dock-shadow);
+  transform: translateX(calc(-1 * var(--dock-w)));
+  transition: transform var(--motion) ease;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  z-index: 2;
+}
+
+.chatdock-open .chatdock-panel {
+  transform: translateX(0);
+}
+
+.chatdock-handle {
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--dock-handle-w));
+  transform: translateY(-50%);
+  width: var(--dock-handle-w);
+  height: 120px;
+  border-radius: 0 80px 80px 0;
+  background: #fff;
+  border: 2px solid #000;
+  border-left: none;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.15);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+  z-index: 3;
+}
+
+.chatdock-handle:hover {
+  background: #f7f7f7;
+}
+
+.chatdock-handle:active {
+  transform: translateY(-50%) scale(0.98);
+}
+
+.app-shiftable {
+  transition: transform var(--motion) ease, filter var(--motion) ease;
+  will-change: transform;
+}
+
+.chatdock-open .app-shiftable {
+  transform: translateX(calc(var(--dock-w) * 0.82)) scale(0.96);
+  filter: saturate(0.95) blur(0.2px);
+}
+
+.chatdock-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+  transition: background var(--motion) ease;
+  z-index: 1;
+}
+
+.chatdock-open .chatdock-backdrop {
+  background: rgba(0, 0, 0, 0.05);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatdock-panel,
+  .app-shiftable,
+  .chatdock-handle,
+  .brace-path {
+    transition: none !important;
   }
 }
 
@@ -153,4 +243,308 @@ body[data-density="compact"] * {
 
 .animate-send-pulse {
   animation: send-pulse calc(var(--motion) * 1.2) ease-in-out infinite;
+}
+
+/* --- Chat dock appearance --- */
+.chatdock-panel {
+  background: rgba(248, 250, 255, 0.8);
+  color: #0f172a;
+  border-right: 1px solid rgba(99, 102, 241, 0.18);
+  backdrop-filter: blur(26px) saturate(1.05);
+  box-shadow:
+    0 32px 80px rgba(79, 70, 229, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  padding: 36px 28px 30px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatdock-inner {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 28px;
+}
+
+.chatdock-open .chatdock-backdrop {
+  background: rgba(15, 23, 42, 0.12);
+  pointer-events: auto;
+}
+
+.chatdock-open .app-shiftable {
+  transform: translateX(calc(var(--dock-w) * 0.78)) scale(0.97);
+  filter: saturate(0.96) blur(0.35px);
+}
+
+.chatdock-handle {
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--dock-handle-w));
+  transform: translateY(-50%);
+  width: var(--dock-handle-w);
+  height: 110px;
+  background: rgba(248, 250, 255, 0.75);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-left: none;
+  border-radius: 0 80px 80px 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow:
+    0 18px 44px rgba(79, 70, 229, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  z-index: 3;
+}
+
+.chatdock-handle:hover {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 22px 54px rgba(79, 70, 229, 0.2);
+}
+
+.chatdock-handle:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.45);
+  outline-offset: 2px;
+}
+
+.brace-svg {
+  width: 16px;
+  height: 84px;
+  position: absolute;
+  right: 6px;
+  opacity: 0.25;
+}
+
+.brace-path {
+  stroke: #1e293b;
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chev-svg {
+  width: 14px;
+  height: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.chev-path {
+  stroke: #475569;
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: scaleX(1);
+  transform-origin: 50% 50%;
+  transition: transform 0.18s ease;
+}
+
+.chatdock-open .chev-path {
+  transform: scaleX(-1);
+}
+
+.chatdock-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+  z-index: 1;
+  transition: background 0.18s ease;
+}
+
+.chatdock-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+  min-height: 0;
+}
+
+.chatdock-header {
+  display: grid;
+  gap: 4px;
+}
+
+.chatdock-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.chatdock-subtitle {
+  font-size: 0.92rem;
+  color: #475569;
+  line-height: 1.5;
+  max-width: 32ch;
+}
+
+.chatdock-thread {
+  position: relative;
+  flex: 1;
+  min-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 30px 28px 30px 34px;
+  border-radius: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(240, 243, 255, 0.78));
+  backdrop-filter: blur(14px) saturate(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 22px 48px rgba(79, 70, 229, 0.12);
+  direction: rtl;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-color: rgba(99, 102, 241, 0.65) rgba(148, 163, 184, 0.12);
+}
+
+.chatdock-thread::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chatdock-thread::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.68), rgba(129, 140, 248, 0.7));
+  border-radius: 999px;
+  border: 1px solid rgba(248, 250, 255, 0.65);
+  min-height: 64px;
+}
+
+.chatdock-thread::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.12);
+  margin-block: 16px;
+  border-radius: 999px;
+}
+
+.chatdock-message {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  padding: 11px 16px;
+  border-radius: 20px;
+  max-width: 85%;
+  border: 1px solid transparent;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.chatdock-message--assistant {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(238, 242, 255, 0.82));
+  border-color: rgba(148, 163, 184, 0.26);
+  border-radius: 20px 20px 20px 8px;
+  color: #1e293b;
+}
+
+.chatdock-message--user {
+  align-self: flex-start;
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.9), rgba(129, 140, 248, 0.82));
+  color: #ffffff;
+  border: 1.5px solid rgba(99, 102, 241, 0.65);
+  border-radius: 20px 8px 20px 20px;
+  box-shadow:
+    0 18px 36px rgba(99, 102, 241, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.chatdock-message--thinking {
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.chatdock-empty {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.chatdock-composer {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.chatdock-input {
+  min-height: 132px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #111827;
+  resize: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 16px 32px rgba(79, 70, 229, 0.05);
+}
+
+.chatdock-input:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.45);
+  outline-offset: 2px;
+}
+
+.chatdock-input::placeholder {
+  color: rgba(71, 85, 105, 0.45);
+}
+
+.chatdock-composerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.chatdock-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #f8fafc;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 1), rgba(139, 92, 246, 0.98));
+  border: none;
+  box-shadow: 0 18px 36px rgba(99, 102, 241, 0.28);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  cursor: pointer;
+}
+
+.chatdock-send:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 42px rgba(99, 102, 241, 0.36);
+}
+
+.chatdock-send:active {
+  transform: translateY(0);
+  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.28);
+}
+
+.chatdock-send:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.chatdock-thread > * {
+  direction: ltr;
+}
+
+.chatdock-error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatdock-handle,
+  .chev-path,
+  .chatdock-thread,
+  .chatdock-send {
+    transition: none !important;
+  }
 }

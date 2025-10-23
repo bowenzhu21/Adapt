@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ChatDock } from "@/components/ChatDock";
+import { ChatClient } from "@/components/ChatClient";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,8 +29,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased selection:bg-primary/20`}
       >
-        <div id="corner-actions" className="fixed top-3 right-3 z-50" />
-        {children}
+        <ChatDock>
+          <ChatClient />
+        </ChatDock>
+        <div id="app-root" className="app-shiftable min-h-dvh">
+          <div id="corner-actions" className="fixed top-3 right-3 z-50" />
+          {children}
+        </div>
       </body>
     </html>
   );

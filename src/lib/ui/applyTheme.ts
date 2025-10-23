@@ -17,6 +17,7 @@ const DEFAULTS = {
   accent: '#a855f7',
   bgA: 'rgba(99, 102, 241, 0.28)',
   bgB: 'rgba(168, 85, 247, 0.22)',
+  dockBg: 'rgba(20, 23, 35, 0.82)',
 };
 
 let debugHooked = false;
@@ -63,6 +64,7 @@ export function applyTheme(theme?: ThemeInput | null): void {
   root.style.setProperty('--accent', accent);
   root.style.setProperty('--bgA', toRgba(primary, 0.28, DEFAULTS.bgA));
   root.style.setProperty('--bgB', toRgba(accent, 0.22, DEFAULTS.bgB));
+  root.style.removeProperty('--dock-bg');
 
   const motion = theme?.motion ?? 'normal';
   const density = theme?.density ?? 'comfy';

@@ -6,7 +6,6 @@ import { EnsureConversation } from '@/components/EnsureConversation';
 import { useConversationId } from '@/hooks/useConversationId';
 import { AdaptiveSurface } from './AdaptiveSurface';
 import { CornerActions } from './CornerActions';
-import { ChatDock } from './ChatDock';
 
 type UiSummary = {
   emotion: string | null;
@@ -139,14 +138,6 @@ export default function HomeClient() {
         >
           <AdaptiveSurface conversationId={conversationId} />
         </motion.section>
-        <footer className="sticky bottom-0">
-          <ChatDock
-            conversationId={conversationId}
-            emotion={uiSummary.emotion}
-            motionDuration={motionDuration}
-            isRealigning={isRealigning}
-          />
-        </footer>
       </main>
     </>
   );

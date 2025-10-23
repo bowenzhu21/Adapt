@@ -5,6 +5,7 @@ import type { UiPlan } from '@/lib/lc/types';
 import { SAFE_PLAN } from '@/lib/lc/planUtils';
 import { classifyIntent } from '@/lib/lc/intent';
 import { classifyEmotion, defaultEmotionForIntent } from '@/lib/lc/emotion';
+import OpenAI from 'openai';
 
 export const runtime = 'nodejs';
 
@@ -129,6 +130,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messageText }, { status });
     }
 
+    const replyPrompt = `In one or two short sentences, reply to the user conversationally based on their last message and the planned UI intent "${plan.intent}" and emotion "${plan.emotion}". Keep it crisp and helpful.`;
+    let reply: string | null = null;
+    try {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const replyRes = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: 'You are Adapt, a concise helpful assistant.' },
+          { role: 'user', content: message },
+          { role: 'assistant', content: replyPrompt },
+        ],
+      });
+      reply = replyRes.choices[0]?.message?.content?.trim() || null;
+    } catch (error) {
+      console.error('Reply generation failed', error);
+    }
+
+    if (reply) {
+      const replyInsert = await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: reply,
+      });
+      if (replyInsert.error) {
+        console.error('Failed to store assistant reply', replyInsert.error);
+      }
+    }
+
     const upsertResult = await supabase
       .from('ui_state')
       .upsert(
@@ -155,6 +185,7 @@ export async function POST(request: Request) {
         components: plan.components,
         emotion: plan.emotion,
         intent: plan.intent,
+        reply,
       },
       { status: 200 },
     );
