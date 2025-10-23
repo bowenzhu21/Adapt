@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { TimerCircle } from '@/components/widgets/TimerCircle';
 import { BreathingCircle } from '@/components/widgets/BreathingCircle';
 import { PlannerWizard } from '@/components/planner/PlannerWizard';
@@ -27,7 +27,7 @@ type DynamicSurfaceProps = {
   components: ComponentEntry[];
 };
 
-type RegistryComponent = (props?: ComponentProps) => JSX.Element;
+type RegistryComponent = (props?: ComponentProps) => ReactElement | null;
 
 export const registry: Partial<Record<string, RegistryComponent>> = {
   journal: JournalPad,
