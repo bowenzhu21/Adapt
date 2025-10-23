@@ -506,7 +506,7 @@ type HeaderProps = {
   subtitle?: string;
 };
 
-function Header({ title = 'Welcome', subtitle }: HeaderProps) {
+function Header({ title = 'Welcome', subtitle }: HeaderProps = {}): ReactElement | null {
   const safeTitle = typeof title === 'string' ? title.trim() : '';
   const safeSubtitle = typeof subtitle === 'string' ? subtitle.trim() : '';
   if (!safeTitle && !safeSubtitle) {
@@ -527,7 +527,7 @@ type TextBlockProps = {
   content?: string;
 };
 
-function TextBlock({ content = '...' }: TextBlockProps) {
+function TextBlock({ content = '...' }: TextBlockProps = {}): ReactElement | null {
   let display: string | null = null;
   if (typeof content === 'string') {
     display = content.trim();
@@ -551,7 +551,7 @@ type JournalPadProps = {
   placeholder?: string;
 };
 
-function JournalPad({ title = 'Journal', placeholder = 'Let the thoughts flow…' }: JournalPadProps) {
+function JournalPad({ title = 'Journal', placeholder = 'Let the thoughts flow…' }: JournalPadProps = {}): ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const autoResize = () => {
@@ -599,7 +599,7 @@ type TodoListProps = {
 function TodoList({
   title = 'Focus Points',
   items = ['Outline the next steps', 'Revisit assumptions', 'Commit to a next action'],
-}: TodoListProps) {
+}: TodoListProps = {}): ReactElement {
   const normalizedItems = Array.isArray(items)
     ? items
         .map((item) => {
@@ -651,7 +651,7 @@ type MusicCardProps = {
   mood?: string;
 };
 
-function MusicCard({ trackName = 'Ambient Focus', artist = 'Adaptive Waves', mood }: MusicCardProps) {
+function MusicCard({ trackName = 'Ambient Focus', artist = 'Adaptive Waves', mood }: MusicCardProps = {}): ReactElement {
   const [playing, setPlaying] = useState(false);
   const bars = [0, 1, 2, 3];
   const motionDuration = useMotionDurationSeconds();
@@ -702,7 +702,7 @@ type MoodImageProps = {
   mood?: string;
 };
 
-function MoodImage({ src, alt = 'Mood visual', caption, intent, mood }: MoodImageProps) {
+function MoodImage({ src, alt = 'Mood visual', caption, intent, mood }: MoodImageProps = {}): ReactElement {
   const computedSrc = useMemo(() => {
     if (src) return src;
     const keyword = encodeURIComponent((intent || mood || 'calm atmosphere').toLowerCase());
@@ -736,7 +736,7 @@ type GalleryProps = {
   images?: string[];
 };
 
-function Gallery({ images = [] }: GalleryProps) {
+function Gallery({ images = [] }: GalleryProps = {}): ReactElement {
   const sanitized = images.filter(Boolean);
   const fallbackImages = ['https://source.unsplash.com/800x600/?creative', 'https://source.unsplash.com/800x600/?focus'];
   const display = sanitized.length > 0 ? sanitized : fallbackImages;
@@ -772,7 +772,7 @@ type MoodGradientProps = {
   intent?: string;
 };
 
-function MoodGradient({ intent }: MoodGradientProps) {
+function MoodGradient({ intent }: MoodGradientProps = {}): ReactElement {
   const [from, to] = useMemo(() => {
     const lower = intent?.toLowerCase() ?? '';
     switch (lower) {
@@ -818,7 +818,7 @@ type EmotionChipProps = {
   emotion?: string;
 };
 
-function EmotionChip({ label, emotion }: EmotionChipProps) {
+function EmotionChip({ label, emotion }: EmotionChipProps = {}): ReactElement {
   const source = (emotion ?? label ?? 'curious').toString();
   const formatted = source
     .replace(/[_-]+/g, ' ')
@@ -839,10 +839,10 @@ function EmotionChip({ label, emotion }: EmotionChipProps) {
 }
 
 type PromptCardProps = {
-  question: string;
+  question?: string;
 };
 
-function PromptCard({ question }: PromptCardProps) {
+function PromptCard({ question = 'What do you want to note?' }: PromptCardProps): ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const autoResize = () => {
@@ -872,10 +872,10 @@ function PromptCard({ question }: PromptCardProps) {
 }
 
 type TaskPromptProps = {
-  goal: string;
+  goal?: string;
 };
 
-function TaskPrompt({ goal }: TaskPromptProps) {
+function TaskPrompt({ goal = 'Define your next small win.' }: TaskPromptProps): ReactElement {
   const [done, setDone] = useState(false);
 
   return (
@@ -902,7 +902,7 @@ type ActionButtonProps = {
   action?: string;
 };
 
-function ActionButton({ label = 'Explore', href, action = 'noop' }: ActionButtonProps) {
+function ActionButton({ label = 'Explore', href, action = 'noop' }: ActionButtonProps = {}): ReactElement {
   const normalizedAction = action?.trim() ?? 'noop';
 
   const lowerAction = normalizedAction.toLowerCase();
