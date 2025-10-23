@@ -2,10 +2,18 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 
 export default function SignupPage() {
+  return (
+    <Suspense fallback={<SignupFallback />}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -127,6 +135,16 @@ export default function SignupPage() {
           </Link>
           .
         </p>
+      </div>
+    </div>
+  );
+}
+
+function SignupFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-100">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 text-center text-sm text-zinc-600 shadow-md">
+        Loading sign-up form…
       </div>
     </div>
   );

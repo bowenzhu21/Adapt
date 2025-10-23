@@ -2,10 +2,18 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -85,6 +93,16 @@ export default function LoginPage() {
           </Link>
           .
         </p>
+      </div>
+    </div>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-100">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 text-center text-sm text-zinc-600 shadow-md">
+        Loading sign-in form…
       </div>
     </div>
   );
