@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { TimerCircle } from '@/components/widgets/TimerCircle';
+import { TimerCircle, type TimerCircleProps } from '@/components/widgets/TimerCircle';
 import { BreathingCircle, type BreathingCircleProps } from '@/components/widgets/BreathingCircle';
 import { PlannerWizard } from '@/components/planner/PlannerWizard';
 import { uiBus } from '@/lib/uiBus';
@@ -37,7 +37,7 @@ export const registry: Partial<Record<string, RegistryComponent>> = {
   header: (props) => <Header {...(props as HeaderProps)} />,
   text: (props) => <TextBlock {...(props as TextBlockProps)} />,
   button: (props) => <ActionButton {...(props as ActionButtonProps)} />,
-  timer: (props) => <TimerCircle {...(props as Record<string, unknown>)} />,
+  timer: (props) => <TimerCircle {...(props as TimerCircleProps)} />,
   moodgradient: (props) => <MoodGradient {...(props as MoodGradientProps)} />,
   quote: (props) => <QuoteBlock {...(props as QuoteProps)} />,
   affirmation: (props) => <AffirmationBlock {...(props as AffirmationProps)} />,

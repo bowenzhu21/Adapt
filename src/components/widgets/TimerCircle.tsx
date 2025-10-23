@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Circle } from './Circle';
 import { uiBus } from '@/lib/uiBus';
 
-type TimerCircleProps = {
+export type TimerCircleProps = {
   seconds?: number;
 };
 
