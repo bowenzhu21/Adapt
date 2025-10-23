@@ -4,9 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { applyTheme, type ThemeInput } from '@/lib/ui/applyTheme';
 
+type UIComponent = {
+  type: string;
+  props?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 type UIState = {
   theme: unknown | null;
-  components: unknown[];
+  components: UIComponent[];
   emotion: string | null;
   intent: string | null;
 };
@@ -19,7 +25,7 @@ type UIStateHookReturn = UIState & {
 type UiStateDetail = {
   conversationId: string;
   theme: unknown | null;
-  components: unknown[];
+  components: UIComponent[];
   emotion: string | null;
   intent: string | null;
   source?: string | null;
@@ -31,6 +37,22 @@ const NOT_FOUND_ERROR = 'NOT_FOUND';
 function emitUiStateUpdate(detail: UiStateDetail) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('ui-state:update', { detail }));
+}
+
+function normalizeComponents(input: unknown): UIComponent[] {
+  const list = Array.isArray(input) ? input : [];
+  return list
+    .filter((item): item is Record<string, unknown> => item !== null && typeof item === 'object')
+    .map((item) => {
+      const type = typeof item.type === 'string' && item.type.trim() ? item.type.trim() : 'text';
+      const props = item.props && typeof item.props === 'object' ? (item.props as Record<string, unknown>) : undefined;
+      return {
+        ...item,
+        type,
+        props,
+      } as UIComponent;
+    })
+    .filter((component) => Boolean(component.type));
 }
 
 async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> {
@@ -74,7 +96,7 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
 
     const data = await response.json();
     const theme = data?.theme ?? null;
-    const components = Array.isArray(data?.components) ? data.components : [];
+    const components = normalizeComponents(data?.components);
     const emotion =
       typeof data?.emotion === 'string'
         ? data.emotion
@@ -112,7 +134,7 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
 
 export function useUIState(conversationId: string): UIStateHookReturn {
   const [theme, setTheme] = useState<unknown | null>(null);
-  const [components, setComponents] = useState<unknown[]>([]);
+  const [components, setComponents] = useState<UIComponent[]>([]);
   const [emotion, setEmotion] = useState<string | null>(null);
   const [intent, setIntent] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -172,8 +194,10 @@ export function useUIState(conversationId: string): UIStateHookReturn {
           ? (themeRecord.intent as string)
           : intentRef.current ?? null;
 
+      const normalizedComponents = normalizeComponents(safeComponents);
+
       setTheme(safeTheme);
-      setComponents(safeComponents);
+      setComponents(normalizedComponents);
       emotionRef.current = safeEmotion ?? null;
       intentRef.current = safeIntent ?? null;
       setEmotion(emotionRef.current);
@@ -191,7 +215,7 @@ export function useUIState(conversationId: string): UIStateHookReturn {
         emitUiStateUpdate({
           conversationId,
           theme: safeTheme,
-          components: safeComponents,
+          components: normalizedComponents,
           emotion: safeEmotion ?? null,
           intent: safeIntent ?? null,
           source: source ?? null,
