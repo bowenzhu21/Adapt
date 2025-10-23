@@ -1,91 +1,59 @@
 'use client';
 
+import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { TimerCircle } from '@/components/widgets/TimerCircle';
+import { BreathingCircle } from '@/components/widgets/BreathingCircle';
+import { PlannerWizard } from '@/components/planner/PlannerWizard';
+import { uiBus } from '@/lib/uiBus';
+import { normalizeType } from '@/lib/lc/componentsMap';
+import { Checklist as ChecklistBlock } from '@/components/blocks/Checklist';
+import { ProgressBar } from '@/components/blocks/ProgressBar';
+import { Soundscape } from '@/components/blocks/Soundscape';
+import { DayGrid } from '@/components/blocks/DayGrid';
+import { MicroKanban } from '@/components/blocks/MicroKanban';
+import { Affirmation as AffirmationBlock } from '@/components/blocks/Affirmation';
+import { Quote as QuoteBlock } from '@/components/blocks/Quote';
 
-type Subscriber = (payload?: unknown) => void;
-
-export type Bus = {
-  on(event: string, fn: Subscriber): () => void;
-  emit(event: string, payload?: unknown): void;
-};
-
-class SimpleBus implements Bus {
-  private listeners = new Map<string, Set<Subscriber>>();
-
-  on(event: string, fn: Subscriber): () => void {
-    const set = this.listeners.get(event) ?? new Set<Subscriber>();
-    set.add(fn);
-    this.listeners.set(event, set);
-
-    return () => {
-      const listeners = this.listeners.get(event);
-      if (!listeners) return;
-      listeners.delete(fn);
-      if (listeners.size === 0) {
-        this.listeners.delete(event);
-      }
-    };
-  }
-
-  emit(event: string, payload?: unknown): void {
-    const listeners = this.listeners.get(event);
-    if (!listeners) return;
-    for (const fn of Array.from(listeners)) {
-      try {
-        fn(payload);
-      } catch (error) {
-        console.error(`uiBus listener for "${event}" failed`, error);
-      }
-    }
-  }
-}
-
-export const uiBus = new SimpleBus();
+type ComponentProps = Record<string, unknown>;
 
 type ComponentEntry = {
   type: string;
-  props?: Record<string, any>;
+  props?: ComponentProps;
 };
 
 type DynamicSurfaceProps = {
   components: ComponentEntry[];
 };
 
-type RegistryKey =
-  | 'chat'
-  | 'journal'
-  | 'todo'
-  | 'breathing'
-  | 'header'
-  | 'text'
-  | 'button'
-  | 'timer'
-  | 'footer';
+type RegistryComponent = (props?: ComponentProps) => JSX.Element;
 
-export const registry: Record<RegistryKey, (props?: any) => JSX.Element> = {
-  chat: ChatPanel,
+export const registry: Partial<Record<string, RegistryComponent>> = {
   journal: JournalPad,
   todo: TodoList,
-  breathing: BreathingGuide,
+  breathing: BreathingCircle,
+  visualbreathing: BreathingCircle,
   header: Header,
   text: TextBlock,
   button: ActionButton,
-  timer: Timer,
+  timer: TimerCircle,
+  moodgradient: MoodGradient,
+  quote: QuoteBlock,
+  affirmation: AffirmationBlock,
+  music: MusicCard,
+  soundscape: Soundscape,
+  moodimage: MoodImage,
+  gallery: Gallery,
+  checklist: ChecklistBlock,
+  progress: ProgressBar,
+  daygrid: DayGrid,
+  kanban: MicroKanban,
+  prompt: PromptCard,
+  task: TaskPrompt,
+  emotionchip: EmotionChip,
+  planner: PlannerWizard,
   footer: FooterNote,
-};
-
-const TYPE_ALIASES: Record<string, RegistryKey> = {
-  title: 'header',
-  heading: 'header',
-  paragraph: 'text',
-  copy: 'text',
-  cta: 'button',
-  button: 'button',
-  countdown: 'timer',
-  timer: 'timer',
-  footer: 'footer',
 };
 
 function isUnitlessString(value: string) {
@@ -187,9 +155,8 @@ function resolveTimerSeconds(rawProps: Record<string, unknown>): number | null {
 }
 
 export function normalizeComponent(entry: ComponentEntry): ComponentEntry {
-  const rawType = entry.type?.toLowerCase?.().trim() ?? '';
-  const normalizedType = (TYPE_ALIASES[rawType] ?? rawType) as string;
-  const props = { ...(entry.props ?? {}) };
+  const normalizedType = normalizeType(entry.type);
+  const props: ComponentProps = { ...(entry.props ?? {}) };
 
   if (normalizedType === 'timer') {
     const seconds = resolveTimerSeconds(props);
@@ -203,6 +170,238 @@ export function normalizeComponent(entry: ComponentEntry): ComponentEntry {
     delete props.value;
     delete props.time;
     delete props.length;
+  }
+
+  if (normalizedType === 'planner') {
+    return {
+      ...entry,
+      type: normalizedType,
+      props: {},
+    };
+  }
+
+  if (normalizedType === 'gallery') {
+    const rawImages = Array.isArray(props.images)
+      ? (props.images as unknown[])
+      : typeof props.images === 'string'
+        ? [props.images]
+        : [];
+    props.images = rawImages
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .map((value) => value.trim());
+  }
+
+  if (normalizedType === 'checklist') {
+    const rawItems = Array.isArray(props.items)
+      ? (props.items as unknown[])
+      : props.items && typeof props.items === 'object'
+        ? [props.items]
+        : [];
+    const checklistItems = rawItems
+      .map((item, index) => {
+        if (typeof item === 'string') {
+          return { id: `item-${index}`, text: item.trim(), done: false };
+        }
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>;
+          const text =
+            typeof record.text === 'string'
+              ? record.text
+              : typeof record.task === 'string'
+              ? record.task
+              : '';
+          if (!text) return null;
+          return {
+            id: typeof record.id === 'string' && record.id.trim() ? record.id : `item-${index}`,
+            text: text.trim(),
+            done: Boolean(record.done ?? record.checked ?? false),
+          };
+        }
+        return null;
+      })
+      .filter((value): value is { id: string; text: string; done: boolean } => Boolean(value && value.text));
+    props.items = checklistItems;
+  }
+
+  if (normalizedType === 'progress') {
+    const value = Number(props.value ?? props.percent ?? props.progress ?? 0);
+    props.label =
+      typeof props.label === 'string' && props.label.trim().length > 0
+        ? props.label.trim()
+        : 'Progress';
+    props.value = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    delete props.percent;
+    delete props.progress;
+  }
+
+  if (normalizedType === 'soundscape') {
+    if (typeof props.title !== 'string' || !props.title.trim()) {
+      props.title = 'Ambient Horizon';
+    } else {
+      props.title = (props.title as string).trim();
+    }
+    if (typeof props.artist !== 'string' || !props.artist.trim()) {
+      props.artist = 'Adapt Waves';
+    } else {
+      props.artist = (props.artist as string).trim();
+    }
+    if (props.playing != null) {
+      props.playing = Boolean(props.playing);
+    }
+  }
+
+  if (normalizedType === 'daygrid') {
+    const rawEntries = Array.isArray(props.entries) ? (props.entries as unknown[]) : [];
+    if (typeof props.day === 'string' && props.day.trim()) {
+      props.day = props.day.trim();
+    }
+    props.entries = rawEntries
+      .map((entry) => {
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>;
+          const time = typeof record.time === 'string' ? record.time : typeof record.start === 'string' ? record.start : '';
+          const text =
+            typeof record.text === 'string'
+              ? record.text
+              : typeof record.title === 'string'
+              ? record.title
+              : '';
+          if (!text) return null;
+          return { time: time || '--:--', text };
+        }
+        return null;
+      })
+      .filter((entry): entry is { time: string; text: string } => Boolean(entry));
+  }
+
+  if (normalizedType === 'kanban') {
+    const toArray = (value: unknown): string[] => {
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => (typeof item === 'string' ? item : null))
+          .filter((item): item is string => Boolean(item && item.trim()))
+          .map((item) => item.trim());
+      }
+      if (typeof value === 'string') {
+        return [value.trim()];
+      }
+      return [];
+    };
+    props.todo = toArray(props.todo ?? props.backlog);
+    props.doing = toArray(props.doing ?? props.in_progress);
+    props.done = toArray(props.done ?? props.complete);
+    delete props.backlog;
+    delete props.in_progress;
+    delete props.complete;
+  }
+
+  if (normalizedType === 'affirmation') {
+    if (typeof props.text !== 'string' || !props.text.trim()) {
+      props.text =
+        typeof props.message === 'string' && props.message.trim()
+          ? props.message
+          : 'You are capable of shaping this moment.';
+    }
+    delete props.message;
+  }
+
+  if (normalizedType === 'quote') {
+    if (typeof props.text !== 'string' || !props.text.trim()) {
+      props.text =
+        typeof props.quote === 'string' && props.quote.trim()
+          ? props.quote
+          : 'Creativity is intelligence having fun.';
+    }
+    props.by =
+      typeof props.by === 'string' && props.by.trim()
+        ? props.by
+        : typeof props.author === 'string' && props.author.trim()
+        ? props.author
+        : undefined;
+    delete props.quote;
+    delete props.author;
+  }
+
+  if (normalizedType === 'todo') {
+    const rawItems = Array.isArray(props.items)
+      ? (props.items as unknown[])
+      : props.items && typeof props.items === 'object'
+        ? [props.items]
+        : [];
+    const todoItems = rawItems
+      .map((item): string | null => {
+        if (typeof item === 'string') {
+          return item;
+        }
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>;
+          if (typeof record.text === 'string') {
+            return record.text;
+          }
+          if (typeof record.task === 'string') {
+            return record.task;
+          }
+        }
+        return null;
+      })
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim());
+    props.items = todoItems;
+  }
+
+  if (normalizedType === 'prompt') {
+    if (typeof props.question !== 'string' || props.question.trim().length === 0) {
+      props.question = 'What is one thing you want to note right now?';
+    }
+  }
+
+  if (normalizedType === 'task') {
+    if (typeof props.goal !== 'string' || props.goal.trim().length === 0) {
+      props.goal = 'Complete one small action to move forward.';
+    }
+  }
+
+  if (normalizedType === 'moodimage') {
+    if (props.intent == null && props.mood == null && props.themeIntent) {
+      props.intent = props.themeIntent;
+    }
+  }
+
+  if (normalizedType === 'quote') {
+    if (typeof props.text !== 'string' || props.text.trim().length === 0) {
+      props.text = 'Take a breath. You are exactly where you need to be.';
+    }
+  }
+
+  if (normalizedType === 'affirmation') {
+    if (typeof props.message !== 'string' || props.message.trim().length === 0) {
+      props.message = 'You are grounded, capable, and ready.';
+    }
+  }
+
+  if (normalizedType === 'music') {
+    if (typeof props.trackName !== 'string' || props.trackName.trim().length === 0) {
+      props.trackName = 'Ambient Focus';
+    }
+    if (typeof props.artist !== 'string' || props.artist.trim().length === 0) {
+      props.artist = 'Adaptive Waves';
+    }
+  }
+
+  if (normalizedType === 'emotionchip') {
+    if (typeof props.label !== 'string' || props.label.trim().length === 0) {
+      props.label = 'Mood';
+    }
+  }
+
+  if (normalizedType === 'visualbreathing' && typeof props.pattern !== 'string') {
+    props.pattern = '4-4-4';
+  }
+
+  if (normalizedType === 'moodgradient') {
+    if (typeof props.intent !== 'string' || props.intent.trim().length === 0) {
+      props.intent = props.mood ?? props.themeIntent ?? '';
+    }
   }
 
   return {
@@ -266,10 +465,15 @@ export function DynamicSurface({ components }: DynamicSurfaceProps) {
         {components.map((component, index) => {
           const normalized = normalizeComponent(component);
           const normalizedProps = normalized.props ?? {};
-          const componentId =
-            typeof normalizedProps.id === 'string' ? normalizedProps.id : undefined;
+          const componentId = typeof normalizedProps.id === 'string' ? normalizedProps.id : undefined;
           const componentKey = componentId ?? `${normalized.type}-${index}`;
-          const Component = registry[(normalized.type ?? '') as RegistryKey];
+          const componentType = normalizeType(normalized.type ?? '');
+          const Component = registry[componentType];
+          const selfContained =
+            componentType === 'timer' ||
+            componentType === 'breathing' ||
+            componentType === 'visualbreathing' ||
+            componentType === 'planner';
 
           return (
             <motion.div
@@ -278,28 +482,21 @@ export function DynamicSurface({ components }: DynamicSurfaceProps) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -14, scale: 0.97 }}
               transition={transition}
-              className="backdrop-blur-md rounded-2xl border border-white/10 bg-bg/30 text-fg pad shadow-[0_18px_48px_-24px_rgba(15,23,42,0.4)] transition-all duration-[var(--motion-duration)]"
+              className={selfContained
+                ? componentType === 'planner'
+                  ? 'w-full'
+                  : 'flex justify-center'
+                : 'backdrop-blur-md rounded-2xl border border-white/10 bg-bg/30 text-fg pad shadow-[0_18px_48px_-24px_rgba(15,23,42,0.4)] transition-all duration-[var(--motion-duration)]'}
             >
               {Component ? (
                 <Component {...normalizedProps} />
               ) : (
-                <TextBlock content="…" />
+                <TextBlock content="This component is not supported yet." />
               )}
             </motion.div>
           );
         })}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function ChatPanel() {
-  return (
-    <div className="flex flex-col gap-2">
-      <h2 className="text-lg font-semibold tracking-tight text-fg">Orientation</h2>
-      <p className="text-sm leading-relaxed text-fg/80">
-        A space to define the vibe. Describe how you want this environment to feel.
-      </p>
     </div>
   );
 }
@@ -310,10 +507,18 @@ type HeaderProps = {
 };
 
 function Header({ title = 'Welcome', subtitle }: HeaderProps) {
+  const safeTitle = typeof title === 'string' ? title.trim() : '';
+  const safeSubtitle = typeof subtitle === 'string' ? subtitle.trim() : '';
+  if (!safeTitle && !safeSubtitle) {
+    return null;
+  }
+
   return (
     <header className="space-y-3">
-      <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{title}</h1>
-      {subtitle ? <p className="text-sm leading-[1.65] text-fg/75">{subtitle}</p> : null}
+      {safeTitle ? (
+        <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{safeTitle}</h1>
+      ) : null}
+      {safeSubtitle ? <p className="text-sm leading-[1.65] text-fg/75">{safeSubtitle}</p> : null}
     </header>
   );
 }
@@ -323,7 +528,22 @@ type TextBlockProps = {
 };
 
 function TextBlock({ content = '...' }: TextBlockProps) {
-  return <p className="text-base leading-[1.6] text-fg/90 sm:text-lg">{content}</p>;
+  let display: string | null = null;
+  if (typeof content === 'string') {
+    display = content.trim();
+  } else if (content != null) {
+    try {
+      display = JSON.stringify(content);
+    } catch {
+      display = String(content);
+    }
+  }
+
+  if (!display) {
+    return null;
+  }
+
+  return <p className="text-base leading-[1.6] text-fg/90 sm:text-lg">{display}</p>;
 }
 
 type JournalPadProps = {
@@ -369,69 +589,309 @@ function JournalPad({ title = 'Journal', placeholder = 'Let the thoughts flow…
   );
 }
 
+type TodoListItem = string | { text?: string; task?: string };
+
 type TodoListProps = {
   title?: string;
-  items?: string[];
+  items?: TodoListItem[];
 };
 
 function TodoList({
   title = 'Focus Points',
   items = ['Outline the next steps', 'Revisit assumptions', 'Commit to a next action'],
 }: TodoListProps) {
+  const normalizedItems = Array.isArray(items)
+    ? items
+        .map((item) => {
+          if (typeof item === 'string') return item.trim();
+          if (item && typeof item === 'object') {
+            if (typeof item.text === 'string') return item.text.trim();
+            if (typeof item.task === 'string') return item.task.trim();
+          }
+          return '';
+        })
+        .filter((text) => Boolean(text))
+    : [];
+
   return (
     <div className="flex flex-col gap-3">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold tracking-tight text-fg">{title}</h2>
         <p className="text-xs uppercase tracking-[0.3em] text-fg/50">Lightweight checklist</p>
       </div>
-      <ul className="space-y-2">
-        {items.map((item, index) => (
-          <motion.li
-            key={`${item}-${index}`}
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.35, delay: index * 0.05, ease: 'easeOut' }}
-            className="flex items-center gap-3 rounded-xl border border-white/10 bg-bg/35 px-3 py-2 text-sm text-fg/85"
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-transparent">
-              <span className="h-2.5 w-2.5 rounded-full bg-primary/70" />
-            </span>
-            <span>{item}</span>
-          </motion.li>
-        ))}
-      </ul>
+      {normalizedItems.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-white/15 bg-bg/20 px-3 py-2 text-sm text-fg/70">
+          No tasks yet. Add tasks in the planner first.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {normalizedItems.map((item, index) => (
+            <motion.li
+              key={`${item}-${index}`}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.35, delay: index * 0.05, ease: 'easeOut' }}
+              className="flex items-center gap-3 rounded-xl border border-white/10 bg-bg/35 px-3 py-2 text-sm text-fg/85"
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-transparent">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary/70" />
+              </span>
+              <span>{item}</span>
+            </motion.li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-type BreathingGuideProps = {
-  pattern?: '4-4-4' | '4-7-8';
+type MusicCardProps = {
+  trackName?: string;
+  artist?: string;
+  mood?: string;
 };
 
-function BreathingGuide({ pattern = '4-4-4' }: BreathingGuideProps) {
-  const totalDuration = pattern === '4-7-8' ? 20 : 14;
-  const guidance =
-    pattern === '4-7-8' ? 'Inhale 4 • Hold 7 • Exhale 8' : 'Steady rhythm • Inhale • Hold • Exhale';
+function MusicCard({ trackName = 'Ambient Focus', artist = 'Adaptive Waves', mood }: MusicCardProps) {
+  const [playing, setPlaying] = useState(false);
+  const bars = [0, 1, 2, 3];
+  const motionDuration = useMotionDurationSeconds();
+  const base = Math.max(motionDuration * 1.2, 0.6);
 
   return (
-    <div className="flex flex-col items-center gap-5 text-center">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-fg/60">Soundscape</p>
+          <h3 className="text-lg font-semibold tracking-tight text-fg">{trackName}</h3>
+          <p className="text-sm text-fg/65">{artist}</p>
+          {mood ? <p className="mt-1 text-xs uppercase tracking-[0.3em] text-fg/50">Mood · {mood}</p> : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setPlaying((prev) => !prev)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-bg/30 text-sm font-medium text-fg/80 transition hover:bg-bg/40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+          aria-label={playing ? 'Pause track' : 'Play track'}
+        >
+          {playing ? '❚❚' : '▶'}
+        </button>
+      </div>
+      <div className="flex h-20 items-end justify-start gap-2">
+        {bars.map((bar, index) => (
+          <motion.span
+            key={bar}
+            className="w-2 rounded-full bg-primary/70"
+            animate={{ scaleY: playing ? [0.35, 1, 0.45] : [0.35] }}
+            transition={{
+              duration: playing ? base + index * 0.1 : 0.001,
+              repeat: playing ? Infinity : 0,
+              ease: 'easeInOut',
+            }}
+            style={{ transformOrigin: '50% 100%' }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type MoodImageProps = {
+  src?: string;
+  alt?: string;
+  caption?: string;
+  intent?: string;
+  mood?: string;
+};
+
+function MoodImage({ src, alt = 'Mood visual', caption, intent, mood }: MoodImageProps) {
+  const computedSrc = useMemo(() => {
+    if (src) return src;
+    const keyword = encodeURIComponent((intent || mood || 'calm atmosphere').toLowerCase());
+    return `https://source.unsplash.com/1600x900/?${keyword}`;
+  }, [src, intent, mood]);
+
+  return (
+    <motion.figure
+      className="overflow-hidden rounded-3xl"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.45, ease: 'easeOut' }}
+    >
+      <div className="relative h-48 w-full sm:h-56 md:h-64">
+        <Image
+          src={computedSrc}
+          alt={alt}
+          fill
+          className="object-cover"
+          sizes="(min-width: 768px) 50vw, 100vw"
+          loading="lazy"
+          unoptimized
+        />
+      </div>
+      {caption ? <figcaption className="mt-2 text-xs text-fg/60">{caption}</figcaption> : null}
+    </motion.figure>
+  );
+}
+
+type GalleryProps = {
+  images?: string[];
+};
+
+function Gallery({ images = [] }: GalleryProps) {
+  const sanitized = images.filter(Boolean);
+  const fallbackImages = ['https://source.unsplash.com/800x600/?creative', 'https://source.unsplash.com/800x600/?focus'];
+  const display = sanitized.length > 0 ? sanitized : fallbackImages;
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {display.slice(0, 4).map((url, index) => (
+        <motion.div
+          key={`${url}-${index}`}
+          className="overflow-hidden rounded-2xl"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.35, delay: index * 0.05, ease: 'easeOut' }}
+        >
+          <div className="relative h-32 w-full">
+            <Image
+              src={url}
+              alt="Gallery"
+              fill
+              className="object-cover transition-transform duration-500 hover:scale-105"
+              sizes="(min-width: 768px) 33vw, 50vw"
+              loading="lazy"
+              unoptimized
+            />
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+type MoodGradientProps = {
+  intent?: string;
+};
+
+function MoodGradient({ intent }: MoodGradientProps) {
+  const [from, to] = useMemo(() => {
+    const lower = intent?.toLowerCase() ?? '';
+    switch (lower) {
+      case 'happy':
+        return ['#fde047', '#f97316'];
+      case 'calm':
+        return ['#bfdbfe', '#c4b5fd'];
+      case 'focus':
+        return ['#bfdbfe', '#1d4ed8'];
+      case 'creative':
+        return ['#fbcfe8', '#f472b6'];
+      case 'reflective':
+        return ['#e2e8f0', '#94a3b8'];
+      case 'energized':
+      case 'energised':
+        return ['#facc15', '#ef4444'];
+      default:
+        return ['#c7d2fe', '#a855f7'];
+    }
+  }, [intent]);
+
+  const label = formatLabel(intent) ?? 'Atmosphere';
+
+  return (
+    <div className="relative h-48 overflow-hidden rounded-3xl sm:h-56 md:h-64">
       <motion.div
-        className="relative flex h-32 w-32 items-center justify-center rounded-full border border-white/15 bg-primary/15"
-        animate={{ scale: [0.85, 1.12, 0.9] }}
-        transition={{ duration: totalDuration, repeat: Infinity, ease: 'easeInOut', times: [0, 0.5, 1] }}
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(circle at 25% 20%, ${from}55, transparent 60%), radial-gradient(circle at 80% 80%, ${to}55, transparent 65%)`,
+        }}
+        animate={{ rotate: [0, 8, -6, 0], scale: [1.05, 1, 1.08, 1.02] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <div className="relative flex h-full w-full items-center justify-center backdrop-blur-sm">
+        <p className="text-sm uppercase tracking-[0.35em] text-fg/60">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+type EmotionChipProps = {
+  label?: string;
+  emotion?: string;
+};
+
+function EmotionChip({ label, emotion }: EmotionChipProps) {
+  const source = (emotion ?? label ?? 'curious').toString();
+  const formatted = source
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs"
+      style={{
+        background: 'color-mix(in oklab, var(--accent) 18%, transparent)',
+        color: 'var(--fg)',
+      }}
+    >
+      {formatted || 'Curious'}
+    </span>
+  );
+}
+
+type PromptCardProps = {
+  question: string;
+};
+
+function PromptCard({ question }: PromptCardProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const autoResize = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    autoResize();
+  }, []);
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold tracking-tight text-fg">{question}</h3>
+      <textarea
+        ref={textareaRef}
+        rows={3}
+        placeholder="Capture your thoughts here…"
+        onChange={autoResize}
+        onInput={autoResize}
+        className="w-full resize-none rounded-2xl border border-white/10 bg-bg/35 px-4 py-3 text-sm leading-relaxed text-fg shadow-inner transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+    </div>
+  );
+}
+
+type TaskPromptProps = {
+  goal: string;
+};
+
+function TaskPrompt({ goal }: TaskPromptProps) {
+  const [done, setDone] = useState(false);
+
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-bg/30 px-4 py-3">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-fg/55">Focus Task</p>
+        <h3 className="text-base font-semibold tracking-tight text-fg">{goal}</h3>
+      </div>
+      <motion.button
+        type="button"
+        onClick={() => setDone((prev) => !prev)}
+        className={`rounded-full px-4 py-1.5 text-sm font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${done ? 'bg-accent/80' : 'bg-primary/80 hover:bg-primary'}`}
+        animate={{ scale: done ? 1.05 : 1 }}
       >
-        <motion.div
-          className="absolute inset-0 rounded-full bg-primary/20 blur-xl"
-          animate={{ opacity: [0.4, 0.9, 0.4] }}
-          transition={{ duration: totalDuration, repeat: Infinity, ease: 'easeInOut', times: [0, 0.5, 1] }}
-        />
-        <motion.div
-          className="relative h-20 w-20 rounded-full bg-primary/60 shadow-[0_0_24px_rgba(168,85,247,0.45)]"
-          animate={{ scale: [0.9, 1.1, 0.92] }}
-          transition={{ duration: totalDuration, repeat: Infinity, ease: 'easeInOut', times: [0, 0.5, 1] }}
-        />
-      </motion.div>
-      <p className="text-sm leading-relaxed text-fg/70">{guidance}</p>
+        {done ? 'Done!' : 'Mark done'}
+      </motion.button>
     </div>
   );
 }
@@ -439,29 +899,56 @@ function BreathingGuide({ pattern = '4-4-4' }: BreathingGuideProps) {
 type ActionButtonProps = {
   label?: string;
   href?: string;
-  action?: 'noop' | 'logout' | 'timer:start' | 'timer:pause' | 'timer:reset';
+  action?: string;
 };
 
-function ActionButton({ label = 'Continue', href, action = 'noop' }: ActionButtonProps) {
-  async function handleClick() {
-    switch (action) {
-      case 'logout': {
-        await supabase.auth.signOut();
-        window.location.assign('/login');
-        break;
-      }
-      case 'timer:start':
-      case 'timer:pause':
-      case 'timer:reset': {
-        uiBus.emit(action);
-        break;
-      }
-      default:
-        break;
-    }
-  }
+function ActionButton({ label = 'Explore', href, action = 'noop' }: ActionButtonProps) {
+  const normalizedAction = action?.trim() ?? 'noop';
 
-  const isNoop = action === 'noop' && !href;
+  const lowerAction = normalizedAction.toLowerCase();
+
+  const handleClick = () => {
+    if (!normalizedAction || lowerAction === 'noop') return;
+    if (lowerAction === 'logout') return;
+
+    if (lowerAction === 'explore' || lowerAction === 'explore:open') {
+      uiBus.emit('explore:open');
+      return;
+    }
+
+    if (lowerAction.startsWith('explore:')) {
+      uiBus.emit(lowerAction);
+      return;
+    }
+
+    if (lowerAction === 'timer:start' || lowerAction === 'timer:pause' || lowerAction === 'timer:reset') {
+      uiBus.emit(lowerAction);
+      return;
+    }
+
+    if (lowerAction === 'breathing:start' || lowerAction === 'breathing:pause' || lowerAction === 'breathing:reset') {
+      uiBus.emit(lowerAction);
+      return;
+    }
+
+    if (lowerAction.startsWith('timer:set:')) {
+      const value = Number(normalizedAction.split(':')[2]);
+      if (Number.isFinite(value) && value > 0) {
+        uiBus.emit('timer:set', value);
+      }
+      return;
+    }
+
+    if (lowerAction.startsWith('breathing:setpattern:')) {
+      const pattern = normalizedAction.split(':')[2];
+      if (pattern) {
+        uiBus.emit('breathing:setPattern', pattern);
+      }
+      return;
+    }
+  };
+
+  const isNoop = lowerAction === 'noop' && !href;
   const commonClasses =
     'inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white shadow-[0_18px_36px_-24px_rgba(15,23,42,0.45)] transition-transform duration-[var(--motion-duration)] hover:scale-[1.03] active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60';
   const backgroundStyle = {
@@ -475,6 +962,7 @@ function ActionButton({ label = 'Continue', href, action = 'noop' }: ActionButto
         className={commonClasses}
         style={backgroundStyle}
         aria-label={label}
+        title={label}
       >
         {label}
       </a>
@@ -489,137 +977,11 @@ function ActionButton({ label = 'Continue', href, action = 'noop' }: ActionButto
       className={commonClasses}
       style={backgroundStyle}
       aria-label={label}
+      aria-disabled={isNoop}
+      title={isNoop ? 'No action configured' : undefined}
     >
       {label}
     </button>
-  );
-}
-
-type TimerProps = {
-  seconds?: number;
-  autostart?: boolean;
-  autoStart?: boolean;
-  state?: 'running' | 'paused';
-  start?: 'running' | 'paused';
-};
-
-function Timer({ seconds = 1500, autostart, autoStart, state, start }: TimerProps) {
-  const derivedAutoStart = useMemo(() => {
-    if (typeof autostart === 'boolean') return autostart;
-    if (typeof autoStart === 'boolean') return autoStart;
-    if (state === 'running' || start === 'running') return true;
-    return false;
-  }, [autostart, autoStart, state, start]);
-
-  const initialSeconds = Math.max(0, Number.isFinite(Number(seconds)) ? Number(seconds) : 1500);
-  const initialRef = useRef(initialSeconds);
-  const [left, setLeft] = useState(initialSeconds);
-  const [running, setRunning] = useState<boolean>(derivedAutoStart);
-  const leftRef = useRef(left);
-  const duration = useMotionDurationSeconds();
-
-  useEffect(() => {
-    const nextSeconds = Math.max(0, Number.isFinite(Number(seconds)) ? Number(seconds) : 1500);
-    initialRef.current = nextSeconds;
-    setLeft(nextSeconds);
-    setRunning(derivedAutoStart);
-  }, [seconds, derivedAutoStart]);
-
-  useEffect(() => {
-    leftRef.current = left;
-  }, [left]);
-
-  useEffect(() => {
-    const pause = uiBus.on('timer:pause', () => setRunning(false));
-    const startListener = uiBus.on('timer:start', () => {
-      if (leftRef.current === 0) {
-        setLeft(initialRef.current);
-      }
-      setRunning(true);
-    });
-    const reset = uiBus.on('timer:reset', () => {
-      setLeft(initialRef.current);
-      setRunning(false);
-    });
-
-    return () => {
-      pause();
-      startListener();
-      reset();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!running) return;
-
-    const id = window.setInterval(() => {
-      setLeft((value) => {
-        if (value <= 1) {
-          window.clearInterval(id);
-          setRunning(false);
-          return 0;
-        }
-        return value - 1;
-      });
-    }, 1000);
-
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [running]);
-
-  const formatted = useMemo(() => {
-    const minutes = Math.floor(left / 60)
-      .toString()
-      .padStart(2, '0');
-    const secs = (left % 60).toString().padStart(2, '0');
-    return `${minutes}:${secs}`;
-  }, [left]);
-
-  const total = Math.max(initialRef.current, 1);
-  const progress = total <= 0 ? 1 : 1 - left / total;
-  const radius = 60;
-  const circumference = 2 * Math.PI * radius;
-
-  return (
-    <div className="flex flex-col items-center gap-3" aria-live="polite">
-      <div className="relative flex items-center justify-center">
-        <svg className="h-40 w-40" viewBox="0 0 160 160">
-          <circle
-            className="text-fg/15"
-            stroke="currentColor"
-            strokeWidth="8"
-            fill="transparent"
-            cx="80"
-            cy="80"
-            r={radius}
-          />
-          <motion.circle
-            stroke="rgb(var(--primary) / 0.9)"
-            strokeLinecap="round"
-            strokeWidth="8"
-            fill="transparent"
-            cx="80"
-            cy="80"
-            r={radius}
-            style={{
-              strokeDasharray: `${circumference} ${circumference}`,
-              strokeDashoffset: circumference - circumference * progress,
-            }}
-            animate={{
-              strokeDashoffset: circumference - circumference * progress,
-            }}
-            transition={{ duration: Math.max(duration, 0.25), ease: 'easeOut' }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-fg/5 backdrop-blur-sm">
-          <span className="text-3xl font-semibold text-fg">{formatted}</span>
-        </div>
-      </div>
-      <p className="text-xs font-medium uppercase tracking-[0.3em] text-fg/60">
-        {running ? 'RUNNING' : 'PAUSED'}
-      </p>
-    </div>
   );
 }
 
@@ -633,4 +995,11 @@ function FooterNote({ note = 'Made with calm.' }: FooterNoteProps) {
       {note}
     </footer>
   );
+}
+
+function formatLabel(value?: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }

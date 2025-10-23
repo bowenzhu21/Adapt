@@ -93,6 +93,8 @@ export async function createServerSupabaseClient() {
   });
 }
 
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
 export async function getUser(): Promise<User | null> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.getUser();

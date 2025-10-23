@@ -9,10 +9,17 @@ export function useConversationId() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedId =
-      typeof window !== 'undefined' ? localStorage.getItem(CONVERSATION_STORAGE_KEY) : null;
-    setConversationIdState(storedId);
-    setIsLoading(false);
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const storedId = localStorage.getItem(CONVERSATION_STORAGE_KEY);
+      setConversationIdState(storedId);
+      setIsLoading(false);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   const setConversationId = useCallback((id: string | null) => {

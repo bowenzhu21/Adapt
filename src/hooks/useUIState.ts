@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { applyTheme, type ThemeInput } from '@/lib/ui/applyTheme';
 
 type UIState = {
-  theme: any | null;
-  components: Array<any>;
+  theme: unknown | null;
+  components: unknown[];
   emotion: string | null;
   intent: string | null;
 };
@@ -15,16 +16,34 @@ type UIStateHookReturn = UIState & {
   error: string | null;
 };
 
+type UiStateDetail = {
+  conversationId: string;
+  theme: unknown | null;
+  components: unknown[];
+  emotion: string | null;
+  intent: string | null;
+  source?: string | null;
+  updatedAt?: number;
+};
+
 const NOT_FOUND_ERROR = 'NOT_FOUND';
+
+function emitUiStateUpdate(detail: UiStateDetail) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('ui-state:update', { detail }));
+}
 
 async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> {
   try {
-    const response = await fetch(`/api/ui-state?conversationId=${encodeURIComponent(conversationId)}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `/api/ui-state?conversationId=${encodeURIComponent(conversationId)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
 
     if (response.status === 404) {
       return {
@@ -56,12 +75,24 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
     const data = await response.json();
     const theme = data?.theme ?? null;
     const components = Array.isArray(data?.components) ? data.components : [];
+    const emotion =
+      typeof data?.emotion === 'string'
+        ? data.emotion
+        : typeof theme?.emotion === 'string'
+        ? theme.emotion
+        : null;
+    const intent =
+      typeof data?.intent === 'string'
+        ? data.intent
+        : typeof theme?.intent === 'string'
+        ? theme.intent
+        : null;
 
     return {
       theme,
       components,
-      emotion: theme?.emotion ?? null,
-      intent: theme?.intent ?? null,
+      emotion,
+      intent,
       loading: false,
       error: null,
     };
@@ -80,20 +111,116 @@ async function fetchUIState(conversationId: string): Promise<UIStateHookReturn> 
 }
 
 export function useUIState(conversationId: string): UIStateHookReturn {
-  const [theme, setTheme] = useState<any | null>(null);
-  const [components, setComponents] = useState<Array<any>>([]);
+  const [theme, setTheme] = useState<unknown | null>(null);
+  const [components, setComponents] = useState<unknown[]>([]);
   const [emotion, setEmotion] = useState<string | null>(null);
   const [intent, setIntent] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!conversationId) {
-      setTheme(null);
-      setComponents([]);
-      setEmotion(null);
-      setIntent(null);
-      setError('Missing conversation identifier.');
+  const lastUpdatedAtRef = useRef(0);
+  const emotionRef = useRef<string | null>(null);
+  const intentRef = useRef<string | null>(null);
+
+  const applyState = useCallback(
+    ({
+      theme: nextTheme,
+      components: nextComponents,
+      emotion: nextEmotion,
+      intent: nextIntent,
+      updatedAt,
+      source,
+      error: nextError,
+      emit = true,
+      force = false,
+    }: {
+      theme: unknown | null;
+      components: unknown[];
+      emotion?: string | null;
+      intent?: string | null;
+      updatedAt?: number;
+      source?: string | null;
+      error?: string | null;
+      emit?: boolean;
+      force?: boolean;
+    }) => {
+      const timestamp =
+        typeof updatedAt === 'number' && Number.isFinite(updatedAt)
+          ? updatedAt
+          : Date.now();
+      if (!force && timestamp <= lastUpdatedAtRef.current) {
+        return;
+      }
+      lastUpdatedAtRef.current = timestamp;
+      const safeTheme = nextTheme ?? null;
+      const themeRecord =
+        safeTheme !== null && typeof safeTheme === 'object'
+          ? (safeTheme as Record<string, unknown>)
+          : null;
+      const themeInput =
+        themeRecord !== null ? (themeRecord as ThemeInput) : undefined;
+      const safeComponents = Array.isArray(nextComponents) ? nextComponents : [];
+      const safeEmotion =
+        nextEmotion !== undefined
+          ? nextEmotion ?? null
+          : themeRecord && typeof themeRecord.emotion === 'string'
+          ? (themeRecord.emotion as string)
+          : emotionRef.current ?? null;
+      const safeIntent =
+        nextIntent !== undefined
+          ? nextIntent ?? null
+          : themeRecord && typeof themeRecord.intent === 'string'
+          ? (themeRecord.intent as string)
+          : intentRef.current ?? null;
+
+      setTheme(safeTheme);
+      setComponents(safeComponents);
+      emotionRef.current = safeEmotion ?? null;
+      intentRef.current = safeIntent ?? null;
+      setEmotion(emotionRef.current);
+      setIntent(intentRef.current);
       setLoading(false);
+      if (nextError !== undefined) {
+        setError(nextError);
+      } else {
+        setError(null);
+      }
+
+      applyTheme(themeInput);
+
+      if (emit) {
+        emitUiStateUpdate({
+          conversationId,
+          theme: safeTheme,
+          components: safeComponents,
+          emotion: safeEmotion ?? null,
+          intent: safeIntent ?? null,
+          source: source ?? null,
+          updatedAt: timestamp,
+        });
+      }
+    },
+    [conversationId],
+  );
+
+  useEffect(() => {
+    lastUpdatedAtRef.current = 0;
+    emotionRef.current = null;
+    intentRef.current = null;
+    if (!conversationId) {
+      emotionRef.current = null;
+      intentRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      applyState({
+        theme: null,
+        components: [],
+        emotion: null,
+        intent: null,
+        updatedAt: Date.now(),
+        source: 'reset',
+        emit: false,
+        force: true,
+        error: 'Missing conversation identifier.',
+      });
       return;
     }
 
@@ -104,12 +231,21 @@ export function useUIState(conversationId: string): UIStateHookReturn {
     fetchUIState(conversationId).then((result) => {
       if (!isMounted) return;
 
-      setTheme(result.theme);
-      setComponents(result.components);
-      setEmotion(result.theme?.emotion ?? null);
-      setIntent(result.theme?.intent ?? null);
-      setError(result.error);
-      setLoading(result.loading);
+      if (result.error && result.error !== NOT_FOUND_ERROR) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+
+      applyState({
+        theme: result.theme,
+        components: result.components,
+        emotion: result.emotion,
+        intent: result.intent,
+        updatedAt: Date.now(),
+        source: 'initial',
+        error: result.error === NOT_FOUND_ERROR ? null : result.error,
+      });
     });
 
     const channel = supabase
@@ -117,43 +253,29 @@ export function useUIState(conversationId: string): UIStateHookReturn {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'ui_state',
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
           if (!payload.new) return;
-          const nextTheme = payload.new.theme ?? null;
-          setTheme(nextTheme);
-          setComponents(
-            Array.isArray(payload.new.components) ? payload.new.components : [],
-          );
-          setEmotion(nextTheme?.emotion ?? null);
-          setIntent(nextTheme?.intent ?? null);
-          setError(null);
-          setLoading(false);
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'ui_state',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          if (!payload.new) return;
-          const nextTheme = payload.new.theme ?? null;
-          setTheme(nextTheme);
-          setComponents(
-            Array.isArray(payload.new.components) ? payload.new.components : [],
-          );
-          setEmotion(nextTheme?.emotion ?? null);
-          setIntent(nextTheme?.intent ?? null);
-          setError(null);
-          setLoading(false);
+          const record = payload.new as {
+            theme?: unknown;
+            components?: unknown;
+            updated_at?: string;
+          };
+          const timestamp = record.updated_at
+            ? new Date(record.updated_at).getTime()
+            : Date.now();
+          applyState({
+            theme: record.theme ?? null,
+            components: Array.isArray(record.components) ? record.components : [],
+            updatedAt: timestamp,
+            source: 'realtime',
+            error: null,
+            force: true,
+          });
         },
       )
       .subscribe();
@@ -162,7 +284,7 @@ export function useUIState(conversationId: string): UIStateHookReturn {
       isMounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [applyState, conversationId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -170,28 +292,20 @@ export function useUIState(conversationId: string): UIStateHookReturn {
     }
 
     const handler = (event: Event) => {
-      const custom = event as CustomEvent<{
-        conversationId: string;
-        theme: any;
-        components: Array<any>;
-        emotion?: string | null;
-        intent?: string | null;
-      } | null>;
-
-      const detail = custom.detail;
+      const detail = (event as CustomEvent<UiStateDetail | null>).detail;
       if (!detail || detail.conversationId !== conversationId) {
         return;
       }
 
-      const nextTheme = detail.theme ?? null;
-      setTheme(nextTheme);
-      setComponents(Array.isArray(detail.components) ? detail.components : []);
-      const nextEmotion =
-        detail.emotion ?? nextTheme?.emotion ?? (detail.intent ? detail.intent : null);
-      setEmotion(nextEmotion ?? null);
-      setIntent(detail.intent ?? nextTheme?.intent ?? null);
-      setError(null);
-      setLoading(false);
+      applyState({
+        theme: detail.theme ?? null,
+        components: Array.isArray(detail.components) ? detail.components : [],
+        emotion: detail.emotion ?? null,
+        intent: detail.intent ?? null,
+        updatedAt: detail.updatedAt,
+        source: detail.source ?? 'external',
+        emit: false,
+      });
     };
 
     window.addEventListener('ui-state:update', handler);
@@ -199,7 +313,7 @@ export function useUIState(conversationId: string): UIStateHookReturn {
     return () => {
       window.removeEventListener('ui-state:update', handler);
     };
-  }, [conversationId]);
+  }, [applyState, conversationId]);
 
   return useMemo(
     () => ({

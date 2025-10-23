@@ -25,8 +25,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-bg font-[var(--font-family,Inter)] text-fg transition-colors duration-[var(--motion-duration)] antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased selection:bg-primary/20`}
       >
+        <div id="corner-actions" className="fixed top-3 right-3 z-50" />
         {children}
       </body>
     </html>
