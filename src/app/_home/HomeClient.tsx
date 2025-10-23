@@ -35,14 +35,14 @@ export default function HomeClient() {
 
     let cancelled = false;
 
-    async function hydrate() {
+    async function hydrate(currentId: string) {
       try {
         const response = await fetch(
-          `/api/ui-state?conversationId=${encodeURIComponent(conversationId)}`,
+          `/api/ui-state?conversationId=${encodeURIComponent(currentId)}`,
         );
         if (!response.ok) return;
         const data = await response.json();
-        if (cancelled) return;
+        if (cancelled || currentId !== conversationId) return;
         setUiSummary({
           emotion: data?.theme?.emotion ?? null,
           intent: data?.theme?.intent ?? null,
@@ -52,7 +52,7 @@ export default function HomeClient() {
       }
     }
 
-    hydrate();
+    hydrate(conversationId);
 
     const handleUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{
