@@ -4,17 +4,17 @@ import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { TimerCircle } from '@/components/widgets/TimerCircle';
-import { BreathingCircle } from '@/components/widgets/BreathingCircle';
+import { BreathingCircle, type BreathingCircleProps } from '@/components/widgets/BreathingCircle';
 import { PlannerWizard } from '@/components/planner/PlannerWizard';
 import { uiBus } from '@/lib/uiBus';
 import { normalizeType } from '@/lib/lc/componentsMap';
-import { Checklist as ChecklistBlock } from '@/components/blocks/Checklist';
-import { ProgressBar } from '@/components/blocks/ProgressBar';
-import { Soundscape } from '@/components/blocks/Soundscape';
-import { DayGrid } from '@/components/blocks/DayGrid';
-import { MicroKanban } from '@/components/blocks/MicroKanban';
-import { Affirmation as AffirmationBlock } from '@/components/blocks/Affirmation';
-import { Quote as QuoteBlock } from '@/components/blocks/Quote';
+import { Checklist as ChecklistBlock, type ChecklistProps } from '@/components/blocks/Checklist';
+import { ProgressBar, type ProgressBarProps } from '@/components/blocks/ProgressBar';
+import { Soundscape, type SoundscapeProps } from '@/components/blocks/Soundscape';
+import { DayGrid, type DayGridProps } from '@/components/blocks/DayGrid';
+import { MicroKanban, type MicroKanbanProps } from '@/components/blocks/MicroKanban';
+import { Affirmation as AffirmationBlock, type AffirmationProps } from '@/components/blocks/Affirmation';
+import { Quote as QuoteBlock, type QuoteProps } from '@/components/blocks/Quote';
 
 type ComponentProps = Record<string, unknown>;
 
@@ -32,23 +32,23 @@ type RegistryComponent = (props?: ComponentProps) => ReactElement | null;
 export const registry: Partial<Record<string, RegistryComponent>> = {
   journal: (props) => <JournalPad {...(props as JournalPadProps)} />,
   todo: (props) => <TodoList {...(props as TodoListProps)} />,
-  breathing: (props) => <BreathingCircle {...(props as Record<string, unknown>)} />,
-  visualbreathing: (props) => <BreathingCircle {...(props as Record<string, unknown>)} />,
+  breathing: (props) => <BreathingCircle {...(props as BreathingCircleProps)} />,
+  visualbreathing: (props) => <BreathingCircle {...(props as BreathingCircleProps)} />,
   header: (props) => <Header {...(props as HeaderProps)} />,
   text: (props) => <TextBlock {...(props as TextBlockProps)} />,
   button: (props) => <ActionButton {...(props as ActionButtonProps)} />,
   timer: (props) => <TimerCircle {...(props as Record<string, unknown>)} />,
   moodgradient: (props) => <MoodGradient {...(props as MoodGradientProps)} />,
-  quote: (props) => <QuoteBlock {...(props as { text?: string; by?: string })} />,
-  affirmation: (props) => <AffirmationBlock {...(props as { text?: string })} />,
+  quote: (props) => <QuoteBlock {...(props as QuoteProps)} />,
+  affirmation: (props) => <AffirmationBlock {...(props as AffirmationProps)} />,
   music: (props) => <MusicCard {...(props as MusicCardProps)} />,
-  soundscape: (props) => <Soundscape {...(props as { title?: string; artist?: string; playing?: boolean })} />,
+  soundscape: (props) => <Soundscape {...(props as SoundscapeProps)} />,
   moodimage: (props) => <MoodImage {...(props as MoodImageProps)} />,
   gallery: (props) => <Gallery {...(props as GalleryProps)} />,
-  checklist: (props) => <ChecklistBlock {...(props as { title?: string; items?: unknown[] })} />,
-  progress: (props) => <ProgressBar {...(props as { label?: string; value?: number })} />,
-  daygrid: (props) => <DayGrid {...(props as { day?: string; entries?: unknown[] })} />,
-  kanban: (props) => <MicroKanban {...(props as { todo?: unknown; doing?: unknown; done?: unknown })} />,
+  checklist: (props) => <ChecklistBlock {...(props as ChecklistProps)} />,
+  progress: (props) => <ProgressBar {...(props as ProgressBarProps)} />,
+  daygrid: (props) => <DayGrid {...(props as DayGridProps)} />,
+  kanban: (props) => <MicroKanban {...(props as MicroKanbanProps)} />,
   prompt: (props) => <PromptCard {...(props as { question?: string })} />,
   task: (props) => <TaskPrompt {...(props as { goal?: string })} />,
   emotionchip: (props) => <EmotionChip {...(props as EmotionChipProps)} />,

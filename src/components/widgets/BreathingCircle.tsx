@@ -7,7 +7,7 @@ import { uiBus } from '@/lib/uiBus';
 
 type BreathingPattern = '4-4-4' | '4-7-8' | '4-4-4-4';
 
-type BreathingCircleProps = {
+export type BreathingCircleProps = {
   pattern?: BreathingPattern;
 };
 

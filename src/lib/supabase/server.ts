@@ -1,18 +1,20 @@
 import { cookies } from 'next/headers';
 import { createClient, type User } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const envSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const envSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl) {
+if (!envSupabaseUrl) {
   throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable.');
 }
 
-if (!supabaseAnonKey) {
+if (!envSupabaseAnonKey) {
   throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable.');
 }
 
+const supabaseUrl = envSupabaseUrl;
+const supabaseAnonKey = envSupabaseAnonKey;
 const supabaseServiceKey = supabaseServiceRoleKey || supabaseAnonKey;
 const ACCESS_TOKEN_COOKIE = 'sb-access-token';
 const LEGACY_STORAGE_COOKIE = (() => {
