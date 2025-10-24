@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { applyTheme, type ThemeInput } from '@/lib/ui/applyTheme';
 
@@ -33,16 +33,7 @@ export function ChatInput({ conversationId, className, emotion }: ChatInputProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('Describe how this space should feel.');
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
   const placeholder = useMemo(() => resolvePlaceholder(emotion), [emotion]);
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }, [message]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -183,7 +174,6 @@ export function ChatInput({ conversationId, className, emotion }: ChatInputProps
         How can I help reimagine this space?
       </label>
       <textarea
-        ref={textareaRef}
         id="chat-input"
         name="message"
         value={message}
@@ -194,6 +184,7 @@ export function ChatInput({ conversationId, className, emotion }: ChatInputProps
         aria-invalid={Boolean(error)}
         aria-describedby={clsx(informationalId, error ? errorId : undefined)}
         className="w-full resize-none rounded-lg border border-white/10 bg-bg/40 px-4 py-3 text-sm leading-relaxed text-fg shadow-inner transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ height: '132px' }}
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p id={informationalId} className="text-xs text-fg/70" aria-live="polite">
